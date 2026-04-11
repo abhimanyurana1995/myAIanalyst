@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Generator
 
 import requests
@@ -159,47 +160,70 @@ class CloudAPIBackend:
             "messages": messages,
             "stream": True,
             "temperature": temperature,
-            "max_tokens": 8192,
+            "max_tokens": 4096,
         }
 
-        try:
-            with requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                stream=True,
-                timeout=self._request_timeout,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-            ) as resp:
-                if resp.status_code != 200:
-                    raise RuntimeError(
-                        f"Groq API error {resp.status_code}: {resp.text[:400]}"
-                    )
-                for line in resp.iter_lines():
-                    if not line:
-                        continue
-                    raw = line.decode("utf-8") if isinstance(line, bytes) else line
-                    if raw.startswith("data: "):
-                        raw = raw[6:]
-                    if raw == "[DONE]":
-                        break
-                    try:
-                        data = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
-                    try:
-                        delta = data["choices"][0]["delta"].get("content", "")
-                        if delta:
-                            yield delta
-                    except (KeyError, IndexError):
-                        pass
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=payload,
+                    stream=True,
+                    timeout=self._request_timeout,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                ) as resp:
+                    if resp.status_code == 429:
+                        # Parse retry-after from error body if available
+                        wait = 45
+                        try:
+                            body = json.loads(resp.text)
+                            msg = body.get("error", {}).get("message", "")
+                            # Extract seconds from "Please try again in Xs"
+                            import re
+                            m = re.search(r"try again in ([\d.]+)s", msg)
+                            if m:
+                                wait = int(float(m.group(1))) + 2
+                        except Exception:
+                            pass
+                        if attempt < max_retries - 1:
+                            logger.warning("Groq rate limit hit. Waiting %ds before retry %d/%d.", wait, attempt + 1, max_retries - 1)
+                            time.sleep(wait)
+                            continue
+                        raise RuntimeError(
+                            f"Groq rate limit exceeded. Please wait a moment and try again."
+                        )
+                    if resp.status_code != 200:
+                        raise RuntimeError(
+                            f"Groq API error {resp.status_code}: {resp.text[:400]}"
+                        )
+                    for line in resp.iter_lines():
+                        if not line:
+                            continue
+                        raw = line.decode("utf-8") if isinstance(line, bytes) else line
+                        if raw.startswith("data: "):
+                            raw = raw[6:]
+                        if raw == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+                        try:
+                            delta = data["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                yield delta
+                        except (KeyError, IndexError):
+                            pass
+                    return  # success
 
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError("Cannot reach Groq API. Check your internet connection.")
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Groq API did not respond in time.")
+            except requests.exceptions.ConnectionError:
+                raise ConnectionError("Cannot reach Groq API. Check your internet connection.")
+            except requests.exceptions.Timeout:
+                raise TimeoutError("Groq API did not respond in time.")
 
 
 # ---------------------------------------------------------------------------

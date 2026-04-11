@@ -16,7 +16,7 @@ llm:
   api:
     provider: "gemini"   # "gemini" or "groq"
     gemini_model: "gemma-2-9b-it"
-    groq_model: "llama-3.3-70b-versatile"   # best Groq model for code generation
+    groq_model: "llama-3.1-8b-instant"   # fast, high rate limits on free tier
     api_key: "${GEMINI_API_KEY}"   # also checks GROQ_API_KEY for groq provider
 
 files:
