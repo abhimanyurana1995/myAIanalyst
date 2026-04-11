@@ -1,0 +1,16 @@
+uploads/
+charts/
+session/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,48 @@
+app:
+  name: "MyAnalyst"
+  host: "127.0.0.1"   # overridden to 0.0.0.0 by APP_HOST env var on Railway
+  port: 5000
+  debug: false
+
+llm:
+  backend: "ollama"   # "ollama" for local, "api" for cloud demo
+  ollama:
+    host: "http://localhost:11434"
+    model: "gemma4:e4b"
+    temperature_analytical: 0.3
+    temperature_conversational: 0.7
+    max_tokens: 8192
+    context_window: 128000
+  api:
+    provider: "gemini"   # "gemini" or "groq"
+    gemini_model: "gemma-2-9b-it"
+    groq_model: "llama-3.3-70b-versatile"   # best Groq model for code generation
+    api_key: "${GEMINI_API_KEY}"   # also checks GROQ_API_KEY for groq provider
+
+files:
+  max_size_mb: 100   # set to 10 for demo/cloud mode
+  upload_dir: "uploads"
+  chart_dir: "charts"
+  allowed_types:
+    - "csv"
+    - "xlsx"
+    - "xls"
+    - "pdf"
+
+session:
+  dir: "session"
+  auto_save: true
+  timeout_minutes: 0   # 0 = no timeout (local); set 30 for demo
+
+sandbox:
+  timeout_seconds: 30
+  max_retries: 3
+
+ui:
+  chart_palette:
+    - "#1E40AF"
+    - "#059669"
+    - "#D97706"
+    - "#DC2626"
+    - "#7C3AED"
+    - "#DB2777"
