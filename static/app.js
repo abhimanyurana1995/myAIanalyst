@@ -43,6 +43,9 @@ const $suggestionChips  = $("suggestion-chips");
 const $mobileFilesBtn   = $("mobile-files-btn");
 const $mobileFilesBadge = $("mobile-files-badge");
 const $fileArea         = document.querySelector("#file-area");
+const $demoBar          = $("demo-bar");
+const $demoModelText    = $("demo-model-text");
+const $demoBarClose     = $("demo-bar-close");
 
 /* =====================================================================
    Initialisation
@@ -99,6 +102,14 @@ function bindEvents() {
   // New session
   $newSessionBtn.addEventListener("click", confirmNewSession);
 
+  // Demo bar dismiss
+  if ($demoBarClose) {
+    $demoBarClose.addEventListener("click", () => {
+      $demoBar.classList.add("hidden");
+      sessionStorage.setItem("demoDismissed", "1");
+    });
+  }
+
   // Mobile file area toggle
   $mobileFilesBtn.addEventListener("click", () => {
     $fileArea.classList.toggle("mobile-open");
@@ -125,12 +136,25 @@ async function checkHealth() {
     const data = await res.json();
     if (data.llm_ok) {
       $llmDot.className = "ok";
-      $llmLabel.textContent = data.llm_backend === "ollama"
-        ? "Ollama ready"
-        : "Cloud API ready";
+      if (data.llm_backend === "ollama") {
+        $llmLabel.textContent = `Local · ${data.llm_model || "Ollama"}`;
+      } else {
+        const provider = (data.llm_provider || "API").toUpperCase();
+        $llmLabel.textContent = `${data.llm_model || "Cloud"} · ${provider}`;
+      }
     } else {
       $llmDot.className = "err";
       $llmLabel.textContent = "LLM offline";
+    }
+
+    // Demo bar — show once per session on cloud deployments
+    if (data.is_demo && !sessionStorage.getItem("demoDismissed")) {
+      const provider = (data.llm_provider || "API").toUpperCase();
+      const model = data.llm_model || "AI model";
+      if ($demoModelText) {
+        $demoModelText.innerHTML = `Powered by <strong>${escHtml(model)}</strong> via ${escHtml(provider)} free tier`;
+      }
+      $demoBar.classList.remove("hidden");
     }
   } catch {
     $llmDot.className = "err";
@@ -434,8 +458,25 @@ function sendMessage() {
       case "error":
         {
           const errDiv = document.createElement("div");
-          errDiv.className = "error-message";
-          errDiv.textContent = data.content;
+          const isRateLimit = data.content && (
+            data.content.toLowerCase().includes("rate limit") ||
+            data.content.includes("429")
+          );
+          if (isRateLimit) {
+            errDiv.className = "error-message rate-limit-message";
+            errDiv.innerHTML = `
+              <strong>Demo under high load</strong><br>
+              Multiple people are using this demo right now and we've hit the free-tier limit.
+              This is a known limitation of the shared free demo — it runs on Groq's free API tier.
+              Please wait 30–60 seconds and try again, or
+              <a href="https://github.com/abhimanyurana1995/myAIanalyst" target="_blank" rel="noopener">
+                run it locally on your own machine
+              </a> for unlimited usage.
+            `;
+          } else {
+            errDiv.className = "error-message";
+            errDiv.textContent = data.content;
+          }
           if (cursorEl && bubble.contains(cursorEl)) bubble.removeChild(cursorEl);
           bubble.appendChild(errDiv);
         }

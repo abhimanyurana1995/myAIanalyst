@@ -399,13 +399,27 @@ def health():
     except Exception as e:
         llm_message = str(e)
 
+    # Resolve the human-readable model name
+    backend_type = cfg["llm"]["backend"]
+    if backend_type == "ollama":
+        model_name = cfg["llm"]["ollama"]["model"]
+    else:
+        provider = cfg["llm"]["api"].get("provider", "gemini")
+        if provider == "groq":
+            model_name = cfg["llm"]["api"].get("groq_model", "llama-3.1-8b-instant")
+        else:
+            model_name = cfg["llm"]["api"].get("gemini_model", "gemma-2-9b-it")
+
     return jsonify({
         "status": "ok",
         "app_name": APP_NAME,
-        "llm_backend": cfg["llm"]["backend"],
+        "llm_backend": backend_type,
+        "llm_provider": cfg["llm"]["api"].get("provider", "") if backend_type == "api" else "ollama",
+        "llm_model": model_name,
         "llm_ok": llm_ok,
         "llm_message": llm_message,
         "files_loaded": len(state.dataframes),
+        "is_demo": bool(_is_cloud),
     })
 
 
