@@ -1,6 +1,9 @@
 uploads/
 charts/
 session/
+01_PRD.md
+02_TECH_SPEC.md
+03_MASTER_PROMPT.md
 __pycache__/
 *.pyc
 *.pyo
